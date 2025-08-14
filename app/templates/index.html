@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Pedidos de Diária</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Estilos adicionais para o conteúdo Markdown */
+        #analysis-results {
+            word-wrap: break-word; /* Garante a quebra de linha de palavras longas */
+            overflow-wrap: break-word; /* Outra propriedade para quebra de linha */
+            max-width: 100%; /* Garante que o conteúdo não ultrapasse o contêiner */
+        }
+        /* Estilos básicos para elementos Markdown */
+        #analysis-results h1, #analysis-results h2, #analysis-results h3 {
+            font-weight: bold;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        #analysis-results h1 { font-size: 1.5rem; }
+        #analysis-results h2 { font-size: 1.25rem; }
+        #analysis-results h3 { font-size: 1.125rem; }
+        #analysis-results ul, #analysis-results ol {
+            list-style-position: inside;
+            padding-left: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        #analysis-results ul li { list-style-type: disc; }
+        #analysis-results ol li { list-style-type: decimal; }
+        #analysis-results p {
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-6">Analisador de Pedidos de Diária</h1>
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-xl font-semibold mb-4">Arquivos para Análise</h2>
+            <select id="file-select" class="w-full p-2 border border-gray-300 rounded-md mb-4">
+                <option value="" disabled selected>Selecione o protocolo...</option>
+                </select>
+            <button id="analyze-btn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Analisar</button>
+        </div>
+
+        <div id="results-container" class="bg-white p-6 rounded-lg shadow-md hidden">
+            <h2 class="text-xl font-semibold mb-4">Resultado da Análise</h2>
+            <div id="analysis-results" class="prose max-w-none mb-4"></div>
+            <button id="save-btn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">Salvar Análise</button>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        const fileSelect = document.getElementById('file-select');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const resultsContainer = document.getElementById('results-container');
+        const analysisResults = document.getElementById('analysis-results');
+        const saveBtn = document.getElementById('save-btn');
+
+        // Fetch list of PDF files
+        const filesResponse = await fetch('/files');
+        const files = await filesResponse.json();
+
+        files.forEach(file => {
+            const option = document.createElement('option');
+            option.value = file;
+            option.textContent = file;
+            fileSelect.appendChild(option);
+        });
+
+        // Analyze button click handler
+        analyzeBtn.addEventListener('click', async () => {
+            const selectedFile = fileSelect.value;
+            if (!selectedFile) return;
+
+            analysisResults.innerHTML = '<p>Analisando...</p>';
+            resultsContainer.classList.remove('hidden');
+
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ filename: selectedFile })
+            });
+
+            const result = await response.json();
+            
+            // =======================================================
+            // ALTERAÇÃO AQUI: Verificando se a função 'marked' existe antes de usá-la
+            // =======================================================
+            let formattedHtml = result.analysis;
+            if (typeof marked === 'function') {
+                formattedHtml = marked(result.analysis);
+            } else {
+                console.error("marked is not a function. Check if the library is loaded correctly.");
+            }
+            
+            analysisResults.innerHTML = formattedHtml;
+            saveBtn.dataset.analysis = result.analysis;
+        });
+
+        // Save button click handler
+        saveBtn.addEventListener('click', async () => {
+            const analysisContent = saveBtn.dataset.analysis;
+            const filename = fileSelect.value.replace('.pdf', '_analise.txt');
+            
+            await fetch('/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ filename: filename, content: analysisContent })
+            });
+
+            alert('Análise salva com sucesso!');
+        });
+    });
+    </script>
+</body>
+</html>
